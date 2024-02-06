@@ -5,10 +5,14 @@ use rand::seq::SliceRandom;
 
 #[derive(Debug)]
 enum Number {
+    K,
+    Q,
+    J,
+    A,
     Value(u8)
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Suit {
     Diamond,
     Club,
@@ -29,6 +33,40 @@ impl Card {
             suit: suit
         }
     }
+    
+    fn is_black(&self) -> bool {
+        return self.suit == Suit::Club || self.suit == Suit::Spade
+    }
+    
+    fn repr_fixed(&self) -> String {
+        // TODO: return fixed width so it's always 3 characters right aligned.
+        let mut s = String::new();
+        
+        let num;
+        
+        match self.number {
+            Number::Value(v) => num = v,
+            _ => num = 255 // TODO: JQKA etc...
+        }
+        
+        let suit;
+        
+        match self.suit {
+            Suit::Diamond => suit = "D",
+            Suit::Club => suit = "C",
+            Suit::Heart => suit = "H",
+            Suit::Spade => suit = "S",
+        }
+        
+        if num < 10 {
+            s.push_str(" ");
+        }
+        s.push_str(" ");
+        
+        s.push_str(&num.to_string());
+        s.push_str(suit);
+        return s;
+    }
 }
 
 #[derive(Debug)]
@@ -41,7 +79,7 @@ impl Deck {
         let cards = Vec::new();
         let mut deck = Deck{cards};
     
-        for i in 1..=12 {
+        for i in 1..=13 {
             for j in 1..=4 {
                 
                 let suit;
@@ -69,16 +107,75 @@ impl Deck {
         let mut rng = rand::thread_rng();
         self.cards.shuffle(&mut rng);
     }
+    
+    fn is_empty(&self) -> bool {
+        return self.cards.is_empty()
+    }
+    
+    fn draw_card(&mut self) -> Card {
+        if self.is_empty() {
+            panic!("Trying to draw from empty deck");
+        }
+        self.cards.pop().unwrap()
+    }
+}
+
+#[derive(Debug)]
+struct GameBoard {
+    card_piles: [Vec<Card>; 7],
+    ace_piles: [Vec<Card>; 4],
+    hand: Vec<Card>,
+    discard: Vec<Card>,
+}
+
+impl GameBoard {
+    fn new(deck: &mut Deck) -> GameBoard{
+        let mut card_piles: [Vec<Card>; 7] = Default::default();
+        let ace_piles: [Vec<Card>; 4] = Default::default();
+        let hand = Vec::new();
+        let discard = Vec::new();
+        
+        for i in 0..=6 {
+            for j in 0..=6 {
+                if i == j {
+                    // Face up card
+                    card_piles[j].push(deck.draw_card());
+                }
+                else if j > i {
+                    // face down cards
+                    card_piles[j].push(deck.draw_card());
+                }
+            }
+        }
+        
+        GameBoard{
+            card_piles,
+            ace_piles,
+            hand,
+            discard,
+        }
+    }
+    
+    fn print(&self) -> () {
+        for card_pile in self.card_piles.iter() {
+            for card in card_pile.iter() {
+                print!("{}", card.repr_fixed());
+            }
+            print!("\n");
+        }
+    }
 }
 
 
 fn main() {
-    println!("Hello, world!");
-
     // Since we know length we could use an array here an it'd be much much speedier.
     let mut deck = Deck::new();
     deck.shuffle();
     
+    let mut game_board = GameBoard::new(&mut deck);
+    
+    //dbg!(&game_board);
+    game_board.print();
     
     
     //dbg!(&card);
