@@ -20,17 +20,26 @@ enum Suit {
     Spade
 }
 
+#[derive(Debug, PartialEq)]
+enum Face {
+    FaceUp,
+    FaceDown,
+}
+
 #[derive(Debug)]
 struct Card {
     number: Number,
-    suit: Suit
+    suit: Suit,
+    // Note: This should probably be a new struct like PlayedCard, but I just want to do it this way for now at least..
+    face: Option<Face>,
 }
 
 impl Card {
     fn new(number: u8, suit: Suit) -> Card {
         Card{
             number: Number::Value(number),
-            suit: suit
+            suit: suit,
+            face: Default::default(),
         }
     }
     
@@ -39,8 +48,19 @@ impl Card {
     }
     
     fn repr_fixed(&self) -> String {
-        // TODO: return fixed width so it's always 3 characters right aligned.
+        // TODO: return fixed width so it's always 3 characters right aligned..
+        // Output looks like..
+        // " QH"
+        // "10C"
+        // " XX" for facedown card
         let mut s = String::new();
+        
+        // TODO if self.face == None panic!
+        
+        if self.face == Some(Face::FaceDown) {
+            s.push_str(" XX");
+            return s
+        }
         
         let num;
         
@@ -49,19 +69,17 @@ impl Card {
             _ => num = 255 // TODO: JQKA etc...
         }
         
-        let suit;
-        
-        match self.suit {
-            Suit::Diamond => suit = "D",
-            Suit::Club => suit = "C",
-            Suit::Heart => suit = "H",
-            Suit::Spade => suit = "S",
-        }
+        let suit = match self.suit {
+            Suit::Diamond => "♦",
+            Suit::Club => "♣",
+            Suit::Heart => "♥",
+            Suit::Spade => "♠",
+        };
         
         if num < 10 {
             s.push_str(" ");
         }
-        s.push_str(" ");
+        
         
         s.push_str(&num.to_string());
         s.push_str(suit);
@@ -82,15 +100,13 @@ impl Deck {
         for i in 1..=13 {
             for j in 1..=4 {
                 
-                let suit;
-                
-                match j {
-                    1 => suit = Suit::Diamond,
-                    2 => suit = Suit::Club,
-                    3 => suit = Suit::Heart,
-                    4 => suit = Suit::Spade,
+                let suit = match j {
+                    1 => Suit::Diamond,
+                    2 => Suit::Club,
+                    3 => Suit::Heart,
+                    4 => Suit::Spade,
                     _ => panic!("Cannot match suit"),
-                }
+                };
                 
                 deck.cards.push(
                     Card::new(
@@ -137,13 +153,15 @@ impl GameBoard {
         
         for i in 0..=6 {
             for j in 0..=6 {
-                if i == j {
-                    // Face up card
-                    card_piles[j].push(deck.draw_card());
-                }
-                else if j > i {
-                    // face down cards
-                    card_piles[j].push(deck.draw_card());
+                if j >= i {
+                    let mut card = deck.draw_card();
+                    if i == j {
+                        card.face = Some(Face::FaceUp);
+                    }
+                    else if j > i {
+                        card.face = Some(Face::FaceDown);
+                    }
+                    card_piles[j].push(card);
                 }
             }
         }
@@ -157,11 +175,29 @@ impl GameBoard {
     }
     
     fn print(&self) -> () {
-        for card_pile in self.card_piles.iter() {
+        println!("      1   2   3   4   5   6   7");
+        for num in 0..self.card_piles.len() {
+            let c = (num + 97) as u8 as char;
+            print!("[ {}]", c);
+            let card_pile = &self.card_piles[num];
             for card in card_pile.iter() {
-                print!("{}", card.repr_fixed());
+                print!(" {}", card.repr_fixed());
             }
             print!("\n");
+        }
+        
+        println!("");
+        for num in 0..self.ace_piles.len() {
+            let c = (num + 65) as u8 as char;
+            
+            let suit = match c {
+                'A' => "♦",
+                'B' => "♣",
+                'C' => "♥",
+                'D' => "♠",
+                _ => panic!("Invalid suit")
+            };
+            println!("[{}{}]", c, suit);
         }
     }
 }
@@ -180,5 +216,6 @@ fn main() {
     
     //dbg!(&card);
     //dbg!(&deck);
-    dbg!(&deck.cards[0]);
+    //dbg!(&deck.cards[0]);
+
 }
