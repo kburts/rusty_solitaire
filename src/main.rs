@@ -1,6 +1,8 @@
 // Rusty Solitare - a solitare implementation written by Kevin in Rust.
 // Will not have a GUI to start, but I may add one some day.
 
+use std::io;
+
 use rand::seq::SliceRandom;
 
 #[derive(Debug)]
@@ -203,14 +205,35 @@ impl GameBoard {
 }
 
 
+fn welcome() {
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+    println!("@ Welcome to Rusty Solitare! @");
+    println!("@        By Kevin            @");
+    println!("@  Please kindly ignore all  @");
+    println!("@  those compiler warnings   @");
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+    println!("");
+    println!("Press enter to start");
+    print!(">>>");
+    println!("");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input);
+}
+
 fn main() {
     // Since we know length we could use an array here an it'd be much much speedier.
+    
+    welcome();
+    
     let mut deck = Deck::new();
     deck.shuffle();
     
     let mut game_board = GameBoard::new(&mut deck);
     
     //dbg!(&game_board);
+    
+    clearscreen::clear().expect("failed to clear screen");
+
     game_board.print();
     
     
