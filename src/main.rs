@@ -2,8 +2,10 @@
 // Will not have a GUI to start, but I may add one some day.
 
 use std::io;
+use std::io::Error;
 
 use rand::seq::SliceRandom;
+use colored::{ColoredString, Colorize};
 
 #[derive(Debug)]
 enum Number {
@@ -23,6 +25,12 @@ enum Suit {
 }
 
 #[derive(Debug, PartialEq)]
+enum Colour {
+    Red,
+    Black,
+}
+
+#[derive(Debug, PartialEq)]
 enum Face {
     FaceUp,
     FaceDown,
@@ -30,7 +38,7 @@ enum Face {
 
 #[derive(Debug)]
 struct Card {
-    number: Number,
+    number: u8,  // TODO: Consider using Number enum again but it makes math really hard...
     suit: Suit,
     // Note: This should probably be a new struct like PlayedCard, but I just want to do it this way for now at least..
     face: Option<Face>,
@@ -39,12 +47,19 @@ struct Card {
 impl Card {
     fn new(number: u8, suit: Suit) -> Card {
         Card{
-            number: Number::Value(number),
+            number: number,
             suit: suit,
             face: Default::default(),
         }
     }
-    
+
+    fn colour(&self) -> Colour {
+        if self.suit == Suit::Diamond || self.suit == Suit::Heart {
+            return Colour::Red;
+        }
+        Colour::Black
+    }
+
     fn is_black(&self) -> bool {
         return self.suit == Suit::Club || self.suit == Suit::Spade
     }
@@ -55,7 +70,7 @@ impl Card {
         // " QH"
         // "10C"
         // " XX" for facedown card
-        let mut s = String::new();
+        let mut s: String = String::new();
         
         // TODO if self.face == None panic!
         
@@ -64,13 +79,8 @@ impl Card {
             return s
         }
         
-        let num;
-        
-        match self.number {
-            Number::Value(v) => num = v,
-            _ => num = 255 // TODO: JQKA etc...
-        }
-        
+        let num= self.number;
+
         let suit = match self.suit {
             Suit::Diamond => "♦",
             Suit::Club => "♣",
@@ -82,9 +92,15 @@ impl Card {
             s.push_str(" ");
         }
         
-        
-        s.push_str(&num.to_string());
-        s.push_str(suit);
+        if self.colour() == Colour::Red {
+            s.push_str(&num.to_string().red());
+            s.push_str(suit);
+        }
+        else {
+            s.push_str(&num.to_string());
+            s.push_str(suit);
+        }
+
         return s;
     }
 }
@@ -150,7 +166,7 @@ impl GameBoard {
     fn new(deck: &mut Deck) -> GameBoard{
         let mut card_piles: [Vec<Card>; 7] = Default::default();
         let ace_piles: [Vec<Card>; 4] = Default::default();
-        let hand = Vec::new();
+        let mut hand = Vec::new();
         let discard = Vec::new();
         
         for i in 0..=6 {
@@ -168,6 +184,10 @@ impl GameBoard {
             }
         }
         
+        while !deck.is_empty() {
+            hand.push(deck.draw_card());
+        }
+        
         GameBoard{
             card_piles,
             ace_piles,
@@ -176,7 +196,59 @@ impl GameBoard {
         }
     }
     
+    fn draw_cards(&mut self) {
+        let draw_size = 3;  // number of cards to draw per turn TODO make static variable
+        
+        //panic!("{} {}", self.hand.len(), draw_size);
+        
+        if self.hand.len() >= draw_size {
+            for i in 0..draw_size {
+                self.discard.push(self.hand.pop().unwrap());
+            }
+        }
+        else if self.hand.len() >= 1 {
+            for i in 0..self.hand.len() {
+                self.discard.push(self.hand.pop().unwrap());
+            }
+        }
+        else {
+            for i in 0..self.discard.len() {
+                self.hand.push(self.discard.pop().unwrap());
+            }
+        }
+    }
+
+    fn place_card(&mut self, command: &str) -> Result<(), &'static str> {
+        // Take a command which is just a single letter and try to place the top discard
+        // card into the corresponding card_pile.
+        let card_pile_char = command.chars().collect::<Vec<char>>()[0];
+
+        if self.discard.len() == 0 {
+            return Err("Cannot place card when discard is empty.")
+        }
+
+        let mut card_pile = &mut self.card_piles[card_pile_char as usize - 97];
+
+        // TODO: If empty then allow placing King only.
+        let top_card_pile = card_pile.last().unwrap();
+        let top_discard = self.discard.last().unwrap();
+
+        // If the colour is different and the number is 1 smaller then the card can be placed,
+        // otherwise it's not allowed.
+        if top_discard.number == top_card_pile.number - 1 && top_discard.colour() != top_card_pile.colour() {
+            card_pile.push(self.discard.pop().unwrap());
+        }
+        else {
+            return Err("Cannot move card onto that card pile!");
+        }
+
+        Ok(())
+
+    }
+    
     fn print(&self) -> () {
+        
+        // Print table card piles
         println!("      1   2   3   4   5   6   7");
         for num in 0..self.card_piles.len() {
             let c = (num + 97) as u8 as char;
@@ -188,6 +260,7 @@ impl GameBoard {
             print!("\n");
         }
         
+        // Print ace card piles
         println!("");
         for num in 0..self.ace_piles.len() {
             let c = (num + 65) as u8 as char;
@@ -201,6 +274,21 @@ impl GameBoard {
             };
             println!("[{}{}]", c, suit);
         }
+        
+        // Print deck
+        println!("");
+        println!("deck: {}", self.hand.len());
+        
+        // Print discard
+        println!("");
+        if self.discard.len() >= 1 {
+            let top_card = self.discard.last().unwrap();
+            println!("{} {}", self.discard.len(), top_card.repr_fixed());
+        }
+        else {
+            println!("{}", self.discard.len());
+        }
+        
     }
 }
 
@@ -220,6 +308,24 @@ fn welcome() {
     io::stdin().read_line(&mut input);
 }
 
+fn handle_turn(game_board: &mut GameBoard, input: String) -> i32 {
+    // On a turn can either draw cards, place a card from the discard, or move cards on the table.
+    // Or quit.
+
+    let command = input.trim();
+    if command == "quit" {
+        return 1
+    }
+    else if command == "" {
+        game_board.draw_cards();
+    }
+    else if command.len() == 1 {
+        game_board.place_card(command);
+    }
+
+    return 0
+}
+
 fn main() {
     // Since we know length we could use an array here an it'd be much much speedier.
     
@@ -232,11 +338,20 @@ fn main() {
     
     //dbg!(&game_board);
     
-    clearscreen::clear().expect("failed to clear screen");
+    loop {
+        clearscreen::clear().expect("failed to clear screen");
+        game_board.print();
+        
+        let mut input = String::new();
+        io::stdin().read_line(&mut input);
 
-    game_board.print();
-    
-    
+        match handle_turn(&mut game_board, input) {
+            1 => break,
+            0 => continue,
+            _ => panic!("bad response"),
+        };
+    }
+   
     //dbg!(&card);
     //dbg!(&deck);
     //dbg!(&deck.cards[0]);
