@@ -5,7 +5,6 @@ use std::io;
 use std::io::Error;
 
 use rand::seq::SliceRandom;
-use colored::{ColoredString, Colorize};
 
 #[derive(Debug)]
 enum Number {
@@ -60,10 +59,27 @@ impl Card {
         Colour::Black
     }
 
-    fn is_black(&self) -> bool {
-        return self.suit == Suit::Club || self.suit == Suit::Spade
+    fn get_face_value(&self) -> String {
+        let mut out = String::new();
+        if self.number == 1 {
+            out = "A".to_string();
+        }
+        else if self.number == 11 {
+            out = "J".to_string();
+        }
+        else if self.number == 12 {
+            out = "Q".to_string();
+        }
+        else if self.number == 13 {
+            out = "K".to_string();
+        }
+        else {
+            out = self.number.to_string();
+        }
+
+        return out
     }
-    
+
     fn repr_fixed(&self) -> String {
         // TODO: return fixed width so it's always 3 characters right aligned..
         // Output looks like..
@@ -78,8 +94,6 @@ impl Card {
             s.push_str(" XX");
             return s
         }
-        
-        let num= self.number;
 
         let suit = match self.suit {
             Suit::Diamond => "♦",
@@ -88,16 +102,18 @@ impl Card {
             Suit::Spade => "♠",
         };
         
-        if num < 10 {
+        if self.number != 10 {
             s.push_str(" ");
         }
         
         if self.colour() == Colour::Red {
-            s.push_str(&num.to_string().red());
+            s.push_str("\x1b[31m");
+            s.push_str(&self.get_face_value().to_string());
             s.push_str(suit);
+            s.push_str("\x1b[0m");
         }
         else {
-            s.push_str(&num.to_string());
+            s.push_str(&self.get_face_value().to_string());
             s.push_str(suit);
         }
 
@@ -233,7 +249,7 @@ impl GameBoard {
         let top_card_pile = card_pile.last().unwrap();
         let top_discard = self.discard.last().unwrap();
 
-        // If the colour is different and the number is 1 smaller then the card can be placed,
+        // If the colour is different and the number is 1 smaller than the card can be placed,
         // otherwise it's not allowed.
         if top_discard.number == top_card_pile.number - 1 && top_discard.colour() != top_card_pile.colour() {
             card_pile.push(self.discard.pop().unwrap());
