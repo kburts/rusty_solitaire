@@ -212,7 +212,7 @@ impl GameBoard {
         }
     }
     
-    fn draw_cards(&mut self) {
+    fn draw_cards(&mut self) -> Result<(), &'static str> {
         let draw_size = 3;  // number of cards to draw per turn TODO make static variable
         
         //panic!("{} {}", self.hand.len(), draw_size);
@@ -232,6 +232,8 @@ impl GameBoard {
                 self.hand.push(self.discard.pop().unwrap());
             }
         }
+
+        Ok(())
     }
 
     fn place_card(&mut self, command: &str) -> Result<(), &'static str> {
@@ -259,7 +261,39 @@ impl GameBoard {
         }
 
         Ok(())
+    }
 
+    fn place_on_ace_pile(&mut self, command: &str) -> Result<(), &'static str> {
+        let ace_pile_char = command.chars().collect::<Vec<char>>()[0];
+
+        if self.discard.len() == 0 {
+            return Err("Cannot place card when discard is empty.")
+        }
+
+        let mut ace_pile = &mut self.ace_piles[ace_pile_char as usize - 65];
+
+        let top_discard = self.discard.last().unwrap();
+        if ace_pile.len() == 0 {
+            if top_discard.number == 1 {
+                ace_pile.push(self.discard.pop().unwrap());
+                return Ok(());
+            }
+            else {
+                return Err("Can only move an Ace onto an empty ace pile!");
+            }
+        }
+
+        let top_ace_pile = ace_pile.last().unwrap();
+
+        if top_discard.number == top_ace_pile.number + 1 && top_discard.suit == top_ace_pile.suit {
+            ace_pile.push(self.discard.pop().unwrap());
+            return Ok(())
+        }
+        else {
+            return Err("Cannot move onto that ace pile!");
+        }
+
+        Ok(())
     }
     
     fn print(&self) -> () {
@@ -288,7 +322,12 @@ impl GameBoard {
                 'D' => "♠",
                 _ => panic!("Invalid suit")
             };
-            println!("[{}{}]", c, suit);
+            print!("[{}{}]", c, suit);
+            let ace_pile = &self.ace_piles[num];
+            for card in ace_pile.iter() {
+                print!(" {}", card.repr_fixed());
+            }
+            print!("\n")
         }
         
         // Print deck
@@ -329,15 +368,13 @@ fn handle_turn(game_board: &mut GameBoard, input: String) -> i32 {
     // Or quit.
 
     let command = input.trim();
-    if command == "quit" {
-        return 1
-    }
-    else if command == "" {
-        game_board.draw_cards();
-    }
-    else if command.len() == 1 {
-        game_board.place_card(command);
-    }
+    let result = match command {
+        "quit" => return 1,
+        "" => game_board.draw_cards(),
+        "a" | "b" | "c" | "d" | "e" | "f" | "g" => game_board.place_card(command),
+        "A" | "B" | "C" | "D" => game_board.place_on_ace_pile(command),
+        _ => return 1
+    };
 
     return 0
 }
@@ -348,7 +385,7 @@ fn main() {
     welcome();
     
     let mut deck = Deck::new();
-    deck.shuffle();
+    // deck.shuffle();
     
     let mut game_board = GameBoard::new(&mut deck);
     
